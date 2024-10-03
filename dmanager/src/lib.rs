@@ -1,6 +1,4 @@
-#[macro_use]
-extern crate litcrypt2;
-use_litcrypt!();
+use obfstr::obfstr;
 
 use std::{collections::HashMap, cell::UnsafeCell};
 use windows::Win32::Foundation::HANDLE;
@@ -33,7 +31,7 @@ impl Manager {
     {   
         if self.payloads.contains_key(&address)
         {
-            return Err(lc!("[x] This address is already mapped."));
+            return Err(obfstr!("[x] This address is already mapped.").to_string());
         }
 
         unsafe 
@@ -75,7 +73,7 @@ impl Manager {
     {   
         if self.payloads.contains_key(&address)
         {
-            return Err(lc!("[x] This shellcode is already mapped."));
+            return Err(obfstr!("[x] This shellcode is already mapped.").to_string());
         }
 
         unsafe 
@@ -160,7 +158,7 @@ impl Manager {
 
                     if ret != 0
                     {
-                        return Err(lc!("[x] Error changing memory protection."));
+                        return Err(obfstr!("[x] Error changing memory protection.").to_string());
                     }
 
                     dinvoke::rtl_zero_memory(*base_address, *size);
@@ -217,7 +215,7 @@ impl Manager {
 
                     if ret != 0
                     {
-                        return Err(lc!("[x] Error changing memory protection."));
+                        return Err(obfstr!("[x] Error changing memory protection.").to_string());
                     }
 
                     let _r = manualmap::map_to_allocated_memory(decrypted_decoy.as_ptr(), addr, pe_info)?;
@@ -248,7 +246,7 @@ impl Manager {
 
                 if !result.is_ok()
                 {
-                    return Err(lc!("[x] Error hiding shellcode."));
+                    return Err(obfstr!("[x] Error hiding shellcode.").to_string());
                 }
             } 
 
@@ -284,7 +282,7 @@ impl Manager {
 
                 if !result.is_ok()
                 {
-                    return Err(lc!("[x] Error stomping shellcode."));
+                    return Err(obfstr!("[x] Error stomping shellcode.").to_string());
                 }
 
             } 

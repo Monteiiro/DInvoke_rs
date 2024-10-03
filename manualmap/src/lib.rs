@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate litcrypt2;
-use_litcrypt!();
-
+use obfstr::obfstr;
 use std::cell::UnsafeCell;
 use std::{collections::HashMap, path::Path};
 use std::{fs, ptr};
@@ -23,7 +20,6 @@ use data::{ImageFileHeader, ImageOptionalHeader64, MEM_COMMIT, MEM_RESERVE,
     SECTION_MEM_READ, SECTION_MEM_WRITE, FILE_EXECUTE, FILE_READ_ATTRIBUTES, SYNCHRONIZE, FILE_READ_DATA, FILE_SHARE_READ, FILE_SHARE_DELETE, 
     FILE_SYNCHRONOUS_IO_NONALERT, FILE_NON_DIRECTORY_FILE, SECTION_ALL_ACCESS, SEC_IMAGE, PeManualMap};
 
-use litcrypt2::lc;
 
 
 /// Manually maps a PE from disk to the memory of the current process.
@@ -48,7 +44,7 @@ use litcrypt2::lc;
 /// ```
 pub fn read_and_map_module (filepath: &str, clean_dos_header: bool, run_callbacks: bool) -> Result<(PeMetadata,usize), String> 
 {
-    let file_content = fs::read(filepath).expect(&lc!("[x] Error opening the specified file."));
+    let file_content = fs::read(filepath).expect(&obfstr!("[x] Error opening the specified file."));
     let file_content_ptr = file_content.as_ptr() as *mut _;
   
     let result = manually_map_module(file_content_ptr, clean_dos_header, run_callbacks)?;
@@ -86,7 +82,7 @@ pub fn manually_map_module (file_ptr: *const u8, clean_dos_headers: bool, run_ca
 {
     let pe_info = get_pe_metadata(file_ptr, false)?;
     if (pe_info.is_32_bit && (size_of::<usize>() == 8)) || (!pe_info.is_32_bit && (size_of::<usize>() == 4)) {
-        return Err(lc!("[x] The module architecture does not match the process architecture."));
+        return Err(obfstr!("[x] The module architecture does not match the process architecture.").to_string());
     }
 
     let dwsize;
@@ -110,7 +106,7 @@ pub fn manually_map_module (file_ptr: *const u8, clean_dos_headers: bool, run_ca
         let _r = dinvoke::close_handle(handle);
 
         if ret != 0 {
-            return Err(lc!("[x] Error allocating memory."));
+            return Err(obfstr!("[x] Error allocating memory.").to_string());
         }
         
         let image_ptr = *base_address;
@@ -200,7 +196,7 @@ pub fn get_pe_metadata (module_ptr: *const u8, check_signature: bool) -> Result<
 
         if pe_metadata.pe != 0x4550 && check_signature
         {
-            return Err(lc!("[x] Invalid PE signature."));
+            return Err(obfstr!("[x] Invalid PE signature.").to_string());
         }
 
         pe_metadata.image_file_header = *((module_ptr as usize + e_lfanew as usize + 0x4) as *mut ImageFileHeader);
@@ -222,7 +218,7 @@ pub fn get_pe_metadata (module_ptr: *const u8, check_signature: bool) -> Result<
         } 
         else 
         {
-            return Err(lc!("[x] Invalid magic value."));
+            return Err(obfstr!("[x] Invalid magic value.").to_string());
         }
 
         let mut sections: Vec<IMAGE_SECTION_HEADER> = vec![];
@@ -248,7 +244,7 @@ pub fn map_module_to_memory(module_ptr: *const u8, image_ptr: *mut c_void, pe_in
 {
     if (pe_info.is_32_bit && (size_of::<usize>() == 8)) || (!pe_info.is_32_bit && (size_of::<usize>() == 4)) 
     {
-        return Err(lc!("[x] The module architecture does not match the process architecture."));
+        return Err(obfstr!("[x] The module architecture does not match the process architecture.").to_string());
     }
 
     let nsize;
@@ -274,7 +270,7 @@ pub fn map_module_to_memory(module_ptr: *const u8, image_ptr: *mut c_void, pe_in
         if ret != 0
         {
             let _r = dinvoke::close_handle(handle);
-            return Err(lc!("[x] Error writing PE headers to the allocated memory."));
+            return Err(obfstr!("[x] Error writing PE headers to the allocated memory.").to_string());
         }
 
         for section in &pe_info.sections
@@ -291,7 +287,7 @@ pub fn map_module_to_memory(module_ptr: *const u8, image_ptr: *mut c_void, pe_in
 
             if ret != 0 || *bytes_written != nsize
             {
-                return Err(lc!("[x] Failed to write PE sections to the allocated memory."))
+                return Err(obfstr!("[x] Failed to write PE sections to the allocated memory.").to_string())
             }
         }
 
@@ -450,7 +446,8 @@ pub fn rewrite_module_iat(pe_info: &PeMetadata, image_ptr: *mut c_void) -> Resul
 
                     if module_handle == 0
                     {
-                        return Err(lc!("[x] Unable to find the specified module: {}", dll_name)); 
+                        let f = obfstr!("[x] Unable to find the specified module").to_string();
+                        return Err(format!("{}: {}", f, dll_name));
                     }
                 }
 
@@ -601,15 +598,15 @@ pub fn add_runtime_table(pe_info: &PeMetadata, image_ptr: *mut c_void)
         for section in &pe_info.sections
         {   
             let s = std::str::from_utf8(&section.Name).unwrap();
-            if s.contains(&lc!(".pdata"))
+            if s.contains(&obfstr!(".pdata"))
             {
                 let entry_count = (section.SizeOfRawData / 12) as i32; // 12 = size_of RUNTIME_FUNCTION
 
                 let func: data::RtlAddFunctionTable;
                 let _ret: Option<bool>;                
-                let k32 = dinvoke::get_module_base_address(&lc!("kernel32.dll"));
+                let k32 = dinvoke::get_module_base_address(&obfstr!("kernel32.dll"));
                 let function_table_addr: usize = image_ptr as usize + section.VirtualAddress as usize;
-                dinvoke::dynamic_invoke!(k32,&lc!("RtlAddFunctionTable"),func,_ret,function_table_addr,entry_count,image_ptr as usize);
+                dinvoke::dynamic_invoke!(k32,&obfstr!("RtlAddFunctionTable"),func,_ret,function_table_addr,entry_count,image_ptr as usize);
             }
         }
     }
@@ -673,7 +670,7 @@ pub fn set_module_section_permissions(pe_info: &PeMetadata, image_ptr: *mut c_vo
             }
             else
             {
-                return Err(lc!("[x] Unknown section permission."));
+                return Err(obfstr!("[x] Unknown section permission.").to_string());
             }
 
             let address: *mut c_void = (image_ptr as usize + section.VirtualAddress as usize) as *mut c_void;
@@ -687,7 +684,7 @@ pub fn set_module_section_permissions(pe_info: &PeMetadata, image_ptr: *mut c_vo
 
             if ret != 0
             {
-                return Err(lc!("[x] Error changing section permission."));
+                return Err(obfstr!("[x] Error changing section permission.").to_string());
             }
 
         }
@@ -741,7 +738,7 @@ pub fn map_to_section(module_path: &str) -> Result<(PeManualMap,HANDLE),String>
     {
         if !Path::new(&module_path).is_file()
         {
-            return Err(lc!("[x] Filepath not found."));
+            return Err(obfstr!("[x] Filepath not found.").to_string());
         }
 
         let module_path = format!("{}{}", "\\??\\", module_path);
@@ -773,7 +770,7 @@ pub fn map_to_section(module_path: &str) -> Result<(PeManualMap,HANDLE),String>
 
         if r != 0
         {   
-            return Err(lc!("[x] Error opening file."));
+            return Err(obfstr!("[x] Error opening file.").to_string());
         }
 
         let max_size: Vec<u8> =vec![0; size_of::<LARGE_INTEGER>()];
@@ -792,7 +789,7 @@ pub fn map_to_section(module_path: &str) -> Result<(PeManualMap,HANDLE),String>
 
         if r != 0
         {   
-            return Err(lc!("[x] Error creating file section in memory."));
+            return Err(obfstr!("[x] Error creating file section in memory.").to_string());
         }
 
         let offset: Vec<u8> =vec![0; size_of::<LARGE_INTEGER>()];
@@ -816,7 +813,7 @@ pub fn map_to_section(module_path: &str) -> Result<(PeManualMap,HANDLE),String>
 
         if r != 0
         {  
-            return Err(lc!("[x] Error mapping file section."));
+            return Err(obfstr!("[x] Error mapping file section.").to_string());
         }
 
         let base_address: *const u8 = std::mem::transmute(*base_address);

